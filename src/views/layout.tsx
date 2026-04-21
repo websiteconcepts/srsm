@@ -67,24 +67,12 @@ const SiteHeader: FC<{ siteName: string; user?: User }> = ({ siteName, user }) =
   <header class="border-b border-saffron-200 bg-white/70 backdrop-blur">
     <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
       <a href="/" class="flex items-center gap-3">
-        <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-saffron-500 font-display text-lg font-bold text-white">
-          ॐ
+        <span class="inline-flex items-center justify-center font-display text-lg font-bold text-white">
+          <img src="https://pub-94c133657de142ba98ab238bbedc18fa.r2.dev/LogoSRSM_PNG.png"
+          style="height:81px" />
         </span>
         <span class="font-display text-lg font-semibold tracking-tight">{siteName}</span>
       </a>
-      <nav class="flex items-center gap-2 text-sm">
-        <a href="/" class="btn-ghost">Events</a>
-        {user ? (
-          <>
-            <a href="/admin" class="btn-ghost">Admin</a>
-            <form method="post" action="/admin/logout" class="inline">
-              <button type="submit" class="btn-ghost">Sign out</button>
-            </form>
-          </>
-        ) : (
-          <a href="/admin/login" class="btn-primary">Admin sign in</a>
-        )}
-      </nav>
     </div>
   </header>
 );
