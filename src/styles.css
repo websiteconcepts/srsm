@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-cream text-ink;
+  }
+  body {
+    @apply font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply btn bg-saffron-600 text-white hover:bg-saffron-700;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-ink hover:bg-saffron-100;
+  }
+  .btn-danger {
+    @apply btn bg-maroon-600 text-white hover:bg-maroon-700;
+  }
+  .input {
+    @apply w-full rounded-md border border-saffron-200 bg-white px-3 py-2 text-sm focus:border-saffron-500 focus:outline-none focus:ring-2 focus:ring-saffron-200;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-ink/80;
+  }
+  .card {
+    @apply rounded-xl bg-white shadow-sm ring-1 ring-saffron-100;
+  }
+
+  .rich-text {
+    @apply text-ink/80 leading-relaxed;
+  }
+  .rich-text h1:not([class]),
+  .rich-text h2:not([class]) {
+    @apply font-display text-2xl font-semibold text-maroon-700 mt-8;
+  }
+  .rich-text h3:not([class]) {
+    @apply font-display text-xl font-semibold text-maroon-700 mt-6;
+  }
+  .rich-text h4:not([class]) {
+    @apply font-display text-lg font-semibold text-maroon-700 mt-6;
+  }
+  .rich-text a:not([class]) {
+    @apply text-saffron-700 underline underline-offset-2 hover:text-saffron-800;
+  }
+  .rich-text strong:not([class]) {
+    @apply font-semibold text-ink;
+  }
+  .rich-text em:not([class]) {
+    @apply italic;
+  }
+  .rich-text ul:not([class]) {
+    @apply list-disc pl-6 space-y-1;
+  }
+  .rich-text ol:not([class]) {
+    @apply list-decimal pl-6 space-y-1;
+  }
+  .rich-text blockquote:not([class]) {
+    @apply border-l-4 border-saffron-500 pl-4 italic text-ink/70;
+  }
+  .rich-text img:not([class]) {
+    @apply my-4 rounded-lg ring-1 ring-saffron-200;
+  }
+  .rich-text hr:not([class]) {
+    @apply my-6 border-saffron-200;
+  }
+  .rich-text table:not([class]) {
+    @apply w-full border-collapse;
+  }
+  .rich-text th:not([class]),
+  .rich-text td:not([class]) {
+    @apply border border-saffron-200 px-3 py-2 text-left;
+  }
+  .rich-text th:not([class]) {
+    @apply bg-saffron-50 font-semibold;
+  }
+}

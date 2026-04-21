@@ -1,0 +1,37 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "srsm-events",
+	"main": "src/index.ts",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "srsm-db",
+			"database_id": "c3f33447-c2fb-4c35-be25-7eba104909ed",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "srsm-media"
+		},
+		{
+			"bucket_name": "srsm-media",
+			"binding": "srsm_media",
+			"remote": true
+		}
+	],
+	"vars": {
+		"SITE_NAME": "Sanatan Rashtra Shankhnad",
+		"SITE_TAGLINE": "A once-in-a-lifetime spiritual awakening",
+		"GOOGLE_MAPS_EMBED_KEY": ""
+	}
+}
