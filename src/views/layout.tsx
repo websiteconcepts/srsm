@@ -65,7 +65,7 @@ export const Layout: FC<LayoutProps> = ({
 
 const SiteHeader: FC<{ siteName: string; user?: User }> = ({ siteName, user }) => (
   <header class="border-b border-saffron-200 bg-white/70 backdrop-blur">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
       <a href="/" class="flex items-center gap-3">
         <span class="inline-flex items-center justify-center font-display text-lg font-bold text-white">
           <img src="https://pub-94c133657de142ba98ab238bbedc18fa.r2.dev/LogoSRSM_PNG.png"
@@ -73,6 +73,22 @@ const SiteHeader: FC<{ siteName: string; user?: User }> = ({ siteName, user }) =
         </span>
         <span class="font-display text-lg font-semibold tracking-tight">{siteName}</span>
       </a>
+      <nav class="flex items-center gap-1 text-sm font-medium sm:gap-2">
+        <a
+          href="/highlights"
+          class="rounded-md px-3 py-2 text-ink/80 transition hover:bg-saffron-100 hover:text-maroon-700"
+        >
+          Highlights
+        </a>
+        {user && (
+          <a
+            href="/admin"
+            class="rounded-md px-3 py-2 text-ink/80 transition hover:bg-saffron-100 hover:text-maroon-700"
+          >
+            Admin
+          </a>
+        )}
+      </nav>
     </div>
   </header>
 );

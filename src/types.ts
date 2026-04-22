@@ -5,6 +5,7 @@ export type Env = {
   SITE_NAME: string;
   SITE_TAGLINE: string;
   GOOGLE_MAPS_EMBED_KEY: string;
+  GOOGLE_DRIVE_API_KEY: string;
 };
 
 export type User = {
