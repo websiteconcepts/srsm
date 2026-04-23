@@ -9,7 +9,7 @@ export const HighlightsPage: FC = () => (
         <span class="font-display text-saffron-700 text-2xl leading-none">॥</span>
         <span class="h-px w-16 bg-saffron-600/30"></span>
       </div>
-      <h1 class="font-display text-4xl md:text-5xl font-bold text-maroon-700">Highlights</h1>
+      <h1 class="font-display text-4xl md:text-5xl font-bold text-maroon-700">Highlights of previous events</h1>
       <p id="tab-subtitle" class="mt-3 text-ink/60">Photos curated from the event</p>
     </header>
 
@@ -180,7 +180,9 @@ export const HighlightsPage: FC = () => (
       const res = await fetch('/api/highlights?event=' + encodeURIComponent(activeTab));
       const data = await res.json();
       if (!res.ok) throw new Error((data && data.error) || 'Request failed');
-      const list = (data.files || []).map(f => ({ ...f, fullDate: fmtDate(f.createdTime) }));
+      const list = (data.files || [])
+        .map(f => ({ ...f, fullDate: fmtDate(f.createdTime) }))
+        .sort((a, b) => new Date(a.createdTime) - new Date(b.createdTime));
       cache[activeTab] = list;
       if (activeTab !== key && !TABS[key]) { /* user switched tabs already, no-op */ }
       files = cache[activeTab];

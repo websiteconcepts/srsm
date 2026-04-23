@@ -9,22 +9,42 @@ export function slugify(s: string): string {
 
 export function formatEventDate(startAt: number, endAt: number | null): string {
   const start = new Date(startAt * 1000);
-  const opts: Intl.DateTimeFormatOptions = {
+
+  const formatter = new Intl.DateTimeFormat("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    hour12: true,
     timeZone: "Asia/Kolkata",
-  };
-  const startStr = start.toLocaleString("en-IN", opts);
+  });
+
+  function format(d: Date, includeDate = true) {
+    const parts = formatter.formatToParts(d);
+
+    const map: Record<string, string> = {};
+    parts.forEach(p => {
+      if (p.type !== "literal") map[p.type] = p.value;
+    });
+
+    if (includeDate) {
+      return `${map.weekday} ${map.day} ${map.month} ${map.year} ${map.hour}:${map.minute} ${map.dayPeriod}`;
+    }
+
+    return `${map.hour}:${map.minute} ${map.dayPeriod}`;
+  }
+
+  const startStr = format(start, true);
+
   if (!endAt) return startStr;
+
   const end = new Date(endAt * 1000);
   const sameDay = start.toDateString() === end.toDateString();
-  const endStr = end.toLocaleString("en-IN", sameDay
-    ? { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }
-    : opts);
+
+  const endStr = sameDay ? format(end, false) : format(end, true);
+
   return `${startStr} — ${endStr}`;
 }
 

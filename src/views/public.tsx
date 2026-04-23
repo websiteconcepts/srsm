@@ -105,7 +105,7 @@ export const EventDetail: FC<{
         <img
           src={heroUrl}
           alt={event.title}
-          class="aspect-[16/8] w-full rounded-xl object-cover shadow-sm"
+          class="w-full rounded-xl object-cover shadow-sm"
         />
       )}
 
