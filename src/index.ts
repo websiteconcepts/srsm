@@ -3,6 +3,7 @@ import type { Env, Variables } from "./types";
 import { loadUser } from "./auth";
 import { publicRoutes } from "./routes/public";
 import { adminRoutes } from "./routes/admin";
+import { donateRoutes } from "./routes/donate";
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -22,6 +23,7 @@ app.get("/media/:key{.+}", async (c) => {
 });
 
 app.route("/admin", adminRoutes);
+app.route("/", donateRoutes);
 app.route("/", publicRoutes);
 
 app.notFound((c) =>

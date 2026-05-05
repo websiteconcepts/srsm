@@ -68,7 +68,7 @@ const SiteHeader: FC<{ siteName: string; user?: User }> = ({ siteName, user }) =
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
       <a href="/" class="flex items-center gap-3">
         <span class="inline-flex items-center justify-center font-display text-lg font-bold text-white">
-          <img src="https://pub-94c133657de142ba98ab238bbedc18fa.r2.dev/LogoSRSM_PNG.png" />
+          <img src="https://srsm.blr1.cdn.digitaloceanspaces.com/images/LogoSRSM_PNG.png" />
         </span>
         <span class="font-display text-lg font-semibold tracking-tight">{siteName}</span>
       </a>

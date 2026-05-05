@@ -1,13 +1,24 @@
-import { Hono } from "hono";
-import type { Env, Event, EventPhoto, User, Variables } from "../types";
+import { Hono, type Context } from "hono";
+import type {
+  Donation,
+  DonationTier,
+  Env,
+  Event,
+  EventPhoto,
+  User,
+  Variables,
+} from "../types";
 import { Layout } from "../views/layout";
 import {
+  AdminShell,
   EventForm,
   EventsDashboard,
   LoginForm,
   SetupForm,
   UsersPage,
 } from "../views/admin";
+import { DonationsAdminList, DonationTiersAdmin } from "../views/donate";
+import { loadDonationTiers } from "../donations";
 import {
   createSession,
   destroySession,
@@ -472,4 +483,491 @@ adminRoutes.post("/users/password", async (c) => {
     .bind(hash, user.id)
     .run();
   return c.redirect("/admin/users");
+});
+
+// ---------------- donations ----------------
+
+function donationDisplayDate(d: Donation): string {
+  const ts = d.transaction_date ?? d.created_at;
+  return new Date(ts * 1000).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+// 'YYYY-MM-DD' (interpreted as IST) → unix epoch at 00:00 IST.
+function istDayStartUnix(dateStr: string | undefined | null): number | null {
+  if (!dateStr) return null;
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  const utcMs = Date.UTC(+y, +mo - 1, +d, 0, 0, 0) - (5 * 60 + 30) * 60_000;
+  return Math.floor(utcMs / 1000);
+}
+
+// Escape user search input for use inside a `LIKE '%' || ? || '%'` parameter.
+// SQLite LIKE wildcards are `%`, `_`. Backslash is the default escape char only
+// when ESCAPE clause is set; we set it explicitly below.
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (ch) => "\\" + ch);
+}
+
+// Map DataTables' numeric column index → the SQL ORDER BY expression.
+// Must mirror the column order in DonationsAdminList's <thead>.
+const DONATION_SORT_COLUMNS = [
+  "COALESCE(transaction_date, created_at)", // 0 Date
+  "buyer_name COLLATE NOCASE",              // 1 Name
+  "amount",                                  // 2 Amount
+  "purpose COLLATE NOCASE",                  // 3 Purpose
+  "status",                                  // 4 Status
+  "receipt",                                 // 5 Receipt
+];
+
+type DonationFilters = {
+  search?: string;
+  status?: string;
+  fromUnix?: number | null;
+  toUnix?: number | null;
+};
+
+function buildDonationFilterClause(
+  f: DonationFilters,
+): { sql: string; binds: unknown[] } {
+  const binds: unknown[] = [];
+  const clauses: string[] = [];
+
+  if (f.fromUnix != null) {
+    clauses.push("created_at >= ?");
+    binds.push(f.fromUnix);
+  }
+  if (f.toUnix != null) {
+    clauses.push("created_at < ?");
+    binds.push(f.toUnix);
+  }
+  if (f.status === "Credit" || f.status === "Pending" || f.status === "Failed") {
+    clauses.push("status = ?");
+    binds.push(f.status);
+  }
+  if (f.search && f.search.trim()) {
+    const term = `%${escapeLike(f.search.trim())}%`;
+    clauses.push(
+      `(buyer_name LIKE ? ESCAPE '\\'
+     OR buyer_email LIKE ? ESCAPE '\\'
+     OR buyer_phone LIKE ? ESCAPE '\\'
+     OR pan LIKE ? ESCAPE '\\'
+     OR purpose LIKE ? ESCAPE '\\'
+     OR receipt LIKE ? ESCAPE '\\'
+     OR payment_id LIKE ? ESCAPE '\\')`,
+    );
+    for (let i = 0; i < 7; i++) binds.push(term);
+  }
+
+  const sql = clauses.length > 0 ? "WHERE " + clauses.join(" AND ") : "";
+  return { sql, binds };
+}
+
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function statusBadgeHtml(status: string): string {
+  if (status === "Credit") {
+    return `<span class="rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">Paid</span>`;
+  }
+  if (status === "Pending") {
+    return `<span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">Pending</span>`;
+  }
+  return `<span class="rounded-full bg-maroon-600/10 px-2 py-1 text-xs font-medium text-maroon-700">Failed</span>`;
+}
+
+function actionsHtml(d: Donation): string {
+  const label =
+    d.status === "Credit" && d.receipt ? "Resend receipt" : "Process / Resend";
+  return (
+    `<form method="post" action="/admin/donations/${d.id}/process" style="display:inline">` +
+    `<button type="submit" class="rounded-md bg-saffron-100 px-3 py-1 text-xs font-semibold text-maroon-700 hover:bg-saffron-200">` +
+    htmlEscape(label) +
+    `</button></form>`
+  );
+}
+
+adminRoutes.get("/donations", async (c) => {
+  const user = c.get("user")!;
+  const totals = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS s FROM donations WHERE status = 'Credit'",
+  ).first<{ c: number; s: number }>();
+
+  const flashKind = c.req.query("flash");
+  const flashMsg = c.req.query("msg");
+  const flash: { kind: "ok" | "err"; message: string } | undefined =
+    flashKind === "ok" || flashKind === "err"
+      ? { kind: flashKind as "ok" | "err", message: flashMsg ?? "" }
+      : undefined;
+
+  return c.html(
+    <Layout title="Donations" siteName={c.env.SITE_NAME} user={user}>
+      <AdminShell user={user} activeTab="donations">
+        <DonationsAdminList
+          total={{ count: totals?.c ?? 0, sum: totals?.s ?? 0 }}
+          flash={flash}
+        />
+      </AdminShell>
+    </Layout>,
+  );
+});
+
+// DataTables server-side endpoint.
+adminRoutes.get("/donations.json", async (c) => {
+  const q = c.req.query();
+  const draw = Number(q.draw ?? 0) || 0;
+  const start = Math.max(0, Number(q.start ?? 0) || 0);
+  const lengthRaw = Number(q.length ?? 25) || 25;
+  const length = lengthRaw < 0 ? 1000 : Math.min(Math.max(1, lengthRaw), 1000);
+
+  const search = (q["search[value]"] ?? "").toString();
+  const orderColIdx = Number(q["order[0][column]"] ?? 0) || 0;
+  const orderDir = q["order[0][dir]"] === "asc" ? "ASC" : "DESC";
+  const orderExpr =
+    DONATION_SORT_COLUMNS[orderColIdx] ?? DONATION_SORT_COLUMNS[0];
+
+  const fromUnix = istDayStartUnix(q.from);
+  const toUnix =
+    istDayStartUnix(q.to) != null ? (istDayStartUnix(q.to) as number) + 86_400 : null;
+
+  // Total (no filters).
+  const totalRow = await c.env.DB.prepare(
+    "SELECT COUNT(*) AS c FROM donations",
+  ).first<{ c: number }>();
+  const recordsTotal = totalRow?.c ?? 0;
+
+  // Filtered count + page.
+  const filter = buildDonationFilterClause({
+    search,
+    status: q.status,
+    fromUnix,
+    toUnix,
+  });
+  const countRow = await c.env.DB.prepare(
+    `SELECT COUNT(*) AS c FROM donations ${filter.sql}`,
+  )
+    .bind(...filter.binds)
+    .first<{ c: number }>();
+  const recordsFiltered = countRow?.c ?? 0;
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM donations ${filter.sql}
+     ORDER BY ${orderExpr} ${orderDir}, id ${orderDir}
+     LIMIT ? OFFSET ?`,
+  )
+    .bind(...filter.binds, length, start)
+    .all<Donation>();
+
+  const data = (results ?? []).map((d) => ({
+    date: htmlEscape(donationDisplayDate(d)),
+    name_email:
+      `<div class="font-medium">${htmlEscape(d.buyer_name)}</div>` +
+      `<div class="text-xs text-ink/50">${htmlEscape(d.buyer_email)}</div>`,
+    amount: `<span class="font-semibold text-maroon-700">₹${d.amount.toLocaleString("en-IN")}</span>`,
+    purpose: htmlEscape(d.purpose ?? ""),
+    status: statusBadgeHtml(d.status),
+    receipt: d.receipt ? htmlEscape(d.receipt) : "—",
+    actions: actionsHtml(d),
+  }));
+
+  return c.json({ draw, recordsTotal, recordsFiltered, data });
+});
+
+// POST /admin/donations/:id/process
+// Force-verify against Instamojo, mark Credit, allocate receipt if missing,
+// re-send the email. Idempotent. Mirrors PHP plugin's force_update_payment().
+adminRoutes.post("/donations/:id/process", async (c) => {
+  const id = Number(c.req.param("id"));
+  const back = (kind: "ok" | "err", msg: string) =>
+    c.redirect(
+      `/admin/donations?flash=${kind}&msg=${encodeURIComponent(msg)}`,
+    );
+
+  const donation = await c.env.DB.prepare(
+    "SELECT * FROM donations WHERE id = ?",
+  )
+    .bind(id)
+    .first<Donation>();
+  if (!donation) return back("err", "Donation not found.");
+
+  if (!c.env.INSTAMOJO_CLIENT_ID || !c.env.INSTAMOJO_CLIENT_SECRET) {
+    return back("err", "Instamojo credentials not configured.");
+  }
+
+  const cfg = {
+    clientId: c.env.INSTAMOJO_CLIENT_ID,
+    clientSecret: c.env.INSTAMOJO_CLIENT_SECRET,
+  };
+
+  // Lazy import to keep admin bundle small? Not necessary on Workers — direct import.
+  const { getPaymentDetails, getPaymentRequest, isPaymentCredit } = await import(
+    "../instamojo"
+  );
+  const { allocateReceiptNumber, buildReceiptHtml, ORG } = await import(
+    "../donations"
+  );
+  const { sendEmail } = await import("../brevo");
+
+  // Step 1: get payment_id (derive from payment_request if missing).
+  let paymentId = donation.payment_id;
+  if (!paymentId) {
+    if (!donation.payment_request_id) {
+      return back("err", "Donation has no payment_request_id.");
+    }
+    try {
+      const pr = await getPaymentRequest(cfg, donation.payment_request_id);
+      const first = pr.payments?.[0];
+      if (!first) {
+        return back("err", "Instamojo: no payment recorded yet for this request.");
+      }
+      // first looks like "https://api.instamojo.com/v2/payments/<id>/"
+      paymentId = first
+        .replace(/^https?:\/\/api\.instamojo\.com\/v2\/payments\//, "")
+        .replace(/\/$/, "");
+      if (!paymentId) return back("err", "Could not parse payment_id from Instamojo response.");
+      console.log(`[donations/${id}/process] derived payment_id=${paymentId}`);
+    } catch (err) {
+      console.error(`[donations/${id}/process] getPaymentRequest failed`, err);
+      return back("err", "Instamojo getPaymentRequest failed (check secrets / tail logs).");
+    }
+  }
+
+  // Step 2: verify.
+  let verify;
+  try {
+    verify = await getPaymentDetails(cfg, paymentId);
+  } catch (err) {
+    console.error(`[donations/${id}/process] getPaymentDetails failed`, err);
+    return back("err", "Instamojo getPaymentDetails failed.");
+  }
+  console.log(`[donations/${id}/process] verify.status=${verify.status}`);
+
+  if (!isPaymentCredit(verify)) {
+    return back(
+      "err",
+      `Instamojo says payment not yet credited (status=${String(verify.status ?? "?")}).`,
+    );
+  }
+
+  // Step 3: mark Credit + capture transaction date.
+  let txnUnix: number | null = donation.transaction_date;
+  if (!txnUnix && typeof verify.created_at === "string") {
+    const t = Date.parse(verify.created_at);
+    if (!Number.isNaN(t)) txnUnix = Math.floor(t / 1000);
+  }
+  await c.env.DB.prepare(
+    `UPDATE donations
+       SET payment_id = ?, status = 'Credit',
+           transaction_date = COALESCE(?, transaction_date)
+     WHERE id = ?`,
+  )
+    .bind(paymentId, txnUnix, id)
+    .run();
+
+  // Step 4: allocate receipt if missing.
+  let receipt = donation.receipt;
+  if (!receipt) {
+    receipt = await allocateReceiptNumber(c.env.DB, id);
+    console.log(`[donations/${id}/process] allocated receipt=${receipt}`);
+  }
+
+  // Step 5: send email (best-effort, but surface errors to admin).
+  if (!c.env.BREVO_API_KEY) {
+    return back(
+      "err",
+      `Marked Paid (receipt ${receipt}) but BREVO_API_KEY is not set — email NOT sent.`,
+    );
+  }
+
+  // Reload row so the email reflects the updated payment_id / txn date / receipt.
+  const fresh = await c.env.DB.prepare(
+    "SELECT * FROM donations WHERE id = ?",
+  )
+    .bind(id)
+    .first<Donation>();
+  if (!fresh) return back("err", "Row vanished after update?");
+
+  try {
+    await sendEmail({
+      apiKey: c.env.BREVO_API_KEY,
+      fromName: ORG.emailFromName,
+      fromEmail: ORG.emailFrom,
+      toName: fresh.buyer_name,
+      toEmail: fresh.buyer_email,
+      bccName: ORG.emailFromName,
+      bccEmail: ORG.emailBcc,
+      subject: ORG.emailSubject,
+      htmlContent: buildReceiptHtml(fresh),
+    });
+  } catch (err) {
+    console.error(`[donations/${id}/process] brevo send failed`, err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return back(
+      "err",
+      `Marked Paid (receipt ${receipt}). Brevo email failed: ${msg.slice(0, 240)}`,
+    );
+  }
+
+  return back("ok", `Receipt ${receipt} sent to ${fresh.buyer_email}.`);
+});
+
+adminRoutes.get("/donations.csv", async (c) => {
+  const q = c.req.query();
+  const fromUnix = istDayStartUnix(q.from);
+  const toUnix =
+    istDayStartUnix(q.to) != null ? (istDayStartUnix(q.to) as number) + 86_400 : null;
+  const filter = buildDonationFilterClause({
+    search: q.search,
+    status: q.status,
+    fromUnix,
+    toUnix,
+  });
+  const { results } = await c.env.DB.prepare(
+    `SELECT * FROM donations ${filter.sql} ORDER BY created_at DESC`,
+  )
+    .bind(...filter.binds)
+    .all<Donation>();
+  const rows = results ?? [];
+
+  const header = [
+    "id",
+    "created_at",
+    "transaction_date",
+    "status",
+    "amount",
+    "currency",
+    "purpose",
+    "buyer_name",
+    "buyer_email",
+    "buyer_phone",
+    "pan",
+    "full_address",
+    "payment_request_id",
+    "payment_id",
+    "receipt",
+  ];
+
+  const csvCell = (v: unknown) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const isoOrEmpty = (u: number | null | undefined) =>
+    u ? new Date(u * 1000).toISOString() : "";
+
+  const lines = [header.join(",")];
+  for (const d of rows) {
+    lines.push(
+      [
+        d.id,
+        isoOrEmpty(d.created_at),
+        isoOrEmpty(d.transaction_date),
+        d.status,
+        d.amount,
+        d.currency,
+        d.purpose,
+        d.buyer_name,
+        d.buyer_email,
+        d.buyer_phone,
+        d.pan,
+        d.full_address,
+        d.payment_request_id ?? "",
+        d.payment_id ?? "",
+        d.receipt ?? "",
+      ]
+        .map(csvCell)
+        .join(","),
+    );
+  }
+
+  return new Response(lines.join("\n"), {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="donations-${new Date().toISOString().slice(0, 10)}.csv"`,
+    },
+  });
+});
+
+// ---------------- donation tiers ----------------
+
+async function renderTiersPage(
+  c: Context<{ Bindings: Env; Variables: Variables }>,
+  opts: { error?: string; editingId?: number } = {},
+) {
+  const user = c.get("user")!;
+  const tiers = await loadDonationTiers(c.env.DB);
+  let editing: DonationTier | undefined;
+  if (opts.editingId) {
+    editing = tiers.find((t) => t.id === opts.editingId);
+  }
+  return c.html(
+    <Layout title="Donation tiers" siteName={c.env.SITE_NAME} user={user}>
+      <AdminShell user={user} activeTab="donation-tiers">
+        <DonationTiersAdmin tiers={tiers} editing={editing} error={opts.error} />
+      </AdminShell>
+    </Layout>,
+  );
+}
+
+adminRoutes.get("/donation-tiers", async (c) => {
+  const editParam = c.req.query("edit");
+  const editingId = editParam ? Number(editParam) : undefined;
+  return renderTiersPage(c, { editingId });
+});
+
+adminRoutes.post("/donation-tiers", async (c) => {
+  const form = await c.req.parseBody();
+  const label = String(form.label ?? "").trim();
+  const amount = Number(form.amount);
+  const sortOrder = Number(form.sort_order ?? 10);
+  if (!label || !Number.isFinite(amount) || amount < 1) {
+    return renderTiersPage(c, {
+      error: "Label is required and amount must be a positive number.",
+    });
+  }
+  await c.env.DB.prepare(
+    "INSERT INTO donation_tiers (label, amount, sort_order) VALUES (?, ?, ?)",
+  )
+    .bind(label, Math.round(amount), Number.isFinite(sortOrder) ? sortOrder : 10)
+    .run();
+  return c.redirect("/admin/donation-tiers");
+});
+
+adminRoutes.post("/donation-tiers/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  const form = await c.req.parseBody();
+  const label = String(form.label ?? "").trim();
+  const amount = Number(form.amount);
+  const sortOrder = Number(form.sort_order ?? 10);
+  if (!label || !Number.isFinite(amount) || amount < 1) {
+    return renderTiersPage(c, {
+      error: "Label is required and amount must be a positive number.",
+      editingId: id,
+    });
+  }
+  await c.env.DB.prepare(
+    "UPDATE donation_tiers SET label = ?, amount = ?, sort_order = ? WHERE id = ?",
+  )
+    .bind(label, Math.round(amount), Number.isFinite(sortOrder) ? sortOrder : 10, id)
+    .run();
+  return c.redirect("/admin/donation-tiers");
+});
+
+adminRoutes.post("/donation-tiers/:id/delete", async (c) => {
+  const id = Number(c.req.param("id"));
+  await c.env.DB.prepare("DELETE FROM donation_tiers WHERE id = ?").bind(id).run();
+  return c.redirect("/admin/donation-tiers");
 });

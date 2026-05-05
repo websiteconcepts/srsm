@@ -6,6 +6,9 @@ export type Env = {
   SITE_TAGLINE: string;
   GOOGLE_MAPS_EMBED_KEY: string;
   GOOGLE_DRIVE_API_KEY: string;
+  INSTAMOJO_CLIENT_ID: string;
+  INSTAMOJO_CLIENT_SECRET: string;
+  BREVO_API_KEY: string;
 };
 
 export type User = {
@@ -33,6 +36,33 @@ export type Event = {
   created_by: number | null;
   created_at: number;
   updated_at: number;
+};
+
+export type DonationTier = {
+  id: number;
+  label: string;
+  amount: number;
+  sort_order: number;
+  created_at: number;
+};
+
+export type Donation = {
+  id: number;
+  payment_request_id: string | null;
+  payment_id: string | null;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  pan: string;
+  full_address: string;
+  amount: number;
+  currency: string;
+  purpose: string;
+  status: "Pending" | "Credit" | "Failed";
+  receipt: string | null;
+  payout_date: number | null;
+  transaction_date: number | null;
+  created_at: number;
 };
 
 export type EventPhoto = {

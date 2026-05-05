@@ -11,7 +11,7 @@ function imgUrl(key: string | null | undefined): string | undefined {
 export const AdminShell: FC<{
   user: User;
   children: any;
-  activeTab?: "events" | "users";
+  activeTab?: "events" | "users" | "donations" | "donation-tiers";
 }> = ({ children, activeTab = "events" }) => (
   <div class="grid gap-8 md:grid-cols-[220px_1fr]">
     <aside class="space-y-1">
@@ -23,6 +23,18 @@ export const AdminShell: FC<{
         class={`block rounded-md px-3 py-2 text-sm ${activeTab === "events" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
       >
         Events
+      </a>
+      <a
+        href="/admin/donations"
+        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "donations" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
+      >
+        Donations
+      </a>
+      <a
+        href="/admin/donation-tiers"
+        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "donation-tiers" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
+      >
+        Donation tiers
       </a>
       <a
         href="/admin/users"
