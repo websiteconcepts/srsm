@@ -8,43 +8,123 @@ function imgUrl(key: string | null | undefined): string | undefined {
   return `/media/${encodeURIComponent(key)}`;
 }
 
-export const AdminShell: FC<{
-  user: User;
-  children: any;
-  activeTab?: "events" | "users" | "donations" | "donation-tiers";
-}> = ({ children, activeTab = "events" }) => (
-  <div class="grid gap-8 md:grid-cols-[220px_1fr]">
-    <aside class="space-y-1">
-      <h2 class="mb-3 text-xs font-semibold uppercase tracking-wider text-ink/50">
-        Admin
-      </h2>
-      <a
-        href="/admin"
-        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "events" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
-      >
-        Events
-      </a>
-      <a
-        href="/admin/donations"
-        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "donations" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
-      >
-        Donations
-      </a>
-      <a
-        href="/admin/donation-tiers"
-        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "donation-tiers" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
-      >
-        Donation tiers
-      </a>
-      <a
-        href="/admin/users"
-        class={`block rounded-md px-3 py-2 text-sm ${activeTab === "users" ? "bg-saffron-100 font-semibold text-maroon-700" : "hover:bg-saffron-50"}`}
-      >
-        Users
-      </a>
-    </aside>
+// Wraps any full-width admin section with a simple "← Admin" back link.
+export const AdminPage: FC<{ children: any }> = ({ children }) => (
+  <div>
+    <a
+      href="/admin"
+      class="mb-6 inline-flex items-center gap-2 text-sm text-ink/60 hover:text-maroon-700"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Admin
+    </a>
     <div>{children}</div>
   </div>
+);
+
+// Tile used on the admin landing page.
+const AdminTile: FC<{
+  href: string;
+  label: string;
+  description: string;
+  children: any;
+}> = ({ href, label, description, children }) => (
+  <a
+    href={href}
+    class="card group flex items-center gap-5 p-6 transition hover:-translate-y-0.5 hover:shadow-md"
+  >
+    <span class="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-saffron-100 text-saffron-700 transition group-hover:bg-saffron-200 group-hover:text-maroon-700">
+      {children}
+    </span>
+    <span>
+      <span class="block font-display text-xl font-semibold text-maroon-700">{label}</span>
+      <span class="text-sm text-ink/60">{description}</span>
+    </span>
+  </a>
+);
+
+const ICON = {
+  calendar: (
+    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  heart: (
+    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+    </svg>
+  ),
+  users: (
+    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  cog: (
+    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+};
+
+export const AdminHome: FC<{ user: User }> = ({ user }) => (
+  <div class="mx-auto max-w-4xl">
+    <header class="mb-10 text-center">
+      <h1 class="font-display text-4xl font-semibold text-maroon-700">Admin</h1>
+      <p class="mt-2 text-ink/60">Welcome back, {user.name}.</p>
+    </header>
+    <div class="grid gap-5 sm:grid-cols-2">
+      <AdminTile href="/admin/events" label="Events" description="Create and edit events">
+        {ICON.calendar}
+      </AdminTile>
+      <AdminTile href="/admin/donations" label="Donations" description="View, filter, resend receipts">
+        {ICON.heart}
+      </AdminTile>
+      <AdminTile href="/admin/users" label="Users" description="Manage admin accounts">
+        {ICON.users}
+      </AdminTile>
+      <AdminTile href="/admin/settings" label="Settings" description="Donation tiers and configuration">
+        {ICON.cog}
+      </AdminTile>
+    </div>
+  </div>
+);
+
+const SettingsLink: FC<{
+  href: string;
+  label: string;
+  description: string;
+}> = ({ href, label, description }) => (
+  <a
+    href={href}
+    class="card flex items-center justify-between p-5 transition hover:bg-saffron-50"
+  >
+    <span>
+      <span class="block font-display text-lg font-semibold text-maroon-700">{label}</span>
+      <span class="text-sm text-ink/60">{description}</span>
+    </span>
+    <span aria-hidden="true" class="text-saffron-700">→</span>
+  </a>
+);
+
+export const AdminSettings: FC = () => (
+  <AdminPage>
+    <h1 class="mb-6 font-display text-3xl font-semibold text-maroon-700">Settings</h1>
+    <div class="space-y-3">
+      <SettingsLink
+        href="/admin/donation-tiers"
+        label="Donation tiers"
+        description="Configure the predefined donation amounts shown on the donate page."
+      />
+    </div>
+  </AdminPage>
 );
 
 export const LoginForm: FC<{ error?: string; next?: string }> = ({ error, next }) => (
@@ -96,7 +176,7 @@ export const SetupForm: FC<{ error?: string }> = ({ error }) => (
 );
 
 export const EventsDashboard: FC<{ user: User; events: Event[] }> = ({ user, events }) => (
-  <AdminShell user={user} activeTab="events">
+  <AdminPage>
     <div class="mb-6 flex items-center justify-between">
       <h1 class="font-display text-3xl font-semibold text-maroon-700">Events</h1>
       <a href="/admin/events/new" class="btn-primary">+ New event</a>
@@ -144,7 +224,7 @@ export const EventsDashboard: FC<{ user: User; events: Event[] }> = ({ user, eve
         </table>
       </div>
     )}
-  </AdminShell>
+  </AdminPage>
 );
 
 export const EventForm: FC<{
@@ -156,7 +236,7 @@ export const EventForm: FC<{
   const isNew = !event;
   const action = isNew ? "/admin/events" : `/admin/events/${event!.id}`;
   return (
-    <AdminShell user={user} activeTab="events">
+    <AdminPage>
       <div class="mb-6 flex items-center justify-between">
         <h1 class="font-display text-3xl font-semibold text-maroon-700">
           {isNew ? "New event" : "Edit event"}
@@ -216,6 +296,9 @@ export const EventForm: FC<{
               Description <span class="text-ink/40">(HTML allowed — e.g. &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;a&gt;, &lt;strong&gt;, &lt;img&gt;)</span>
             </label>
             <textarea class="input min-h-[200px] font-mono text-sm" id="description" name="description">{event?.description ?? ""}</textarea>
+            <p class="mt-1 text-xs text-ink/50">
+              Shortcodes: <code class="rounded bg-saffron-100 px-1">[donate]</code> embeds the live donation form (uses current tiers).
+            </p>
           </div>
           <div>
             <label class="label" for="location_name">Location name</label>
@@ -349,7 +432,7 @@ export const EventForm: FC<{
           </section>
         </>
       )}
-    </AdminShell>
+    </AdminPage>
   );
 };
 
@@ -358,7 +441,7 @@ export const UsersPage: FC<{ user: User; users: User[]; error?: string }> = ({
   users,
   error,
 }) => (
-  <AdminShell user={user} activeTab="users">
+  <AdminPage>
     <h1 class="mb-6 font-display text-3xl font-semibold text-maroon-700">Users</h1>
     <FlashError message={error} />
 
@@ -433,5 +516,5 @@ export const UsersPage: FC<{ user: User; users: User[]; error?: string }> = ({
         <button type="submit" class="btn-primary">Update password</button>
       </div>
     </form>
-  </AdminShell>
+  </AdminPage>
 );

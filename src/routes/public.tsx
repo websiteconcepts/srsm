@@ -3,6 +3,7 @@ import type { Env, Event, EventPhoto, Variables } from "../types";
 import { Layout, Hero } from "../views/layout";
 import { EventList, EventDetail } from "../views/public";
 import { HighlightsPage } from "../views/highlights";
+import { expandShortcodes } from "../shortcodes";
 
 // Public Google Drive folders whose images drive the /highlights page.
 // Keyed by short slug; the client sends ?event=<slug>.
@@ -98,6 +99,12 @@ publicRoutes.get("/events/:slug", async (c) => {
   )
     .bind(event.id)
     .all<EventPhoto>();
+
+  // Expand [donate] (and any future) shortcodes in the description.
+  if (event.description) {
+    event.description = await expandShortcodes(event.description, { db: c.env.DB });
+  }
+
   return c.html(
     <Layout
       title={event.title}

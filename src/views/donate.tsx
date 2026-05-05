@@ -2,21 +2,24 @@ import type { FC } from "hono/jsx";
 import { raw } from "hono/html";
 import { ORG } from "../donations";
 import type { Donation, DonationTier } from "../types";
+import { AdminPage } from "./admin";
 
 export const DonateForm: FC<{
   tiers: DonationTier[];
   error?: string;
   values?: Record<string, string>;
 }> = ({ tiers, error, values = {} }) => (
-  <div class="mx-auto max-w-2xl">
+  <div class="donation_widget_wrapper mx-auto max-w-2xl">
     <header class="mb-8 text-center">
       <div aria-hidden="true" class="mb-3 flex items-center justify-center gap-3">
         <span class="h-px w-16 bg-saffron-600/30"></span>
         <span class="font-display text-saffron-700 text-2xl leading-none">॥</span>
         <span class="h-px w-16 bg-saffron-600/30"></span>
       </div>
-      <h1 class="font-display text-4xl md:text-5xl font-bold text-maroon-700">Donate</h1>
-      <p class="mt-3 text-ink/60">
+      <h1 id="donation_title" class="font-display text-4xl md:text-5xl font-bold text-maroon-700">
+        Donate
+      </h1>
+      <p id="donation_subtitle" class="mt-3 text-ink/60">
         Support {ORG.name} and the Sanatan Rashtra Shankhnad Mahotsav.
       </p>
     </header>
@@ -160,7 +163,7 @@ export const DonateForm: FC<{
       </div>
     </form>
 
-    <p class="mt-6 text-center text-sm text-ink/50">
+    <p id="donation_footnote" class="mt-6 text-center text-sm text-ink/50">
       Donations to {ORG.name} are eligible for 80G tax deduction · PAN {ORG.pan}
     </p>
 
@@ -321,7 +324,7 @@ export const DonationTiersAdmin: FC<{
   editing?: DonationTier;
   error?: string;
 }> = ({ tiers, editing, error }) => (
-  <div>
+  <AdminPage>
     <div class="mb-6 flex items-center justify-between">
       <h1 class="font-display text-3xl font-semibold text-maroon-700">Donation tiers</h1>
     </div>
@@ -441,14 +444,14 @@ export const DonationTiersAdmin: FC<{
         )}
       </div>
     </form>
-  </div>
+  </AdminPage>
 );
 
 export const DonationsAdminList: FC<{
   total: { count: number; sum: number };
   flash?: { kind: "ok" | "err"; message: string };
 }> = ({ total, flash }) => (
-  <div>
+  <AdminPage>
     {/* DataTables assets */}
     <link
       rel="stylesheet"
@@ -583,5 +586,5 @@ $(function(){
   $('#filter-from, #filter-to, #filter-status').on('change', syncCsvLink);
 });
 </script>`)}
-  </div>
+  </AdminPage>
 );

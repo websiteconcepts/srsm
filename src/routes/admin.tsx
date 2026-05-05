@@ -10,7 +10,8 @@ import type {
 } from "../types";
 import { Layout } from "../views/layout";
 import {
-  AdminShell,
+  AdminHome,
+  AdminSettings,
   EventForm,
   EventsDashboard,
   LoginForm,
@@ -154,14 +155,33 @@ adminRoutes.use("/*", async (c, next) => {
   return requireUser(c, next);
 });
 
-// Dashboard
+// Admin landing page — icon grid.
 adminRoutes.get("/", async (c) => {
+  const user = c.get("user")!;
+  return c.html(
+    <Layout title="Admin" siteName={c.env.SITE_NAME} user={user}>
+      <AdminHome user={user} />
+    </Layout>,
+  );
+});
+
+// Events list (formerly the /admin landing page).
+adminRoutes.get("/events", async (c) => {
   const { results } = await c.env.DB.prepare(
     "SELECT * FROM events ORDER BY start_at DESC",
   ).all<Event>();
   return c.html(
-    <Layout title="Admin" siteName={c.env.SITE_NAME} user={c.get("user")}>
+    <Layout title="Events" siteName={c.env.SITE_NAME} user={c.get("user")}>
       <EventsDashboard user={c.get("user")!} events={results ?? []} />
+    </Layout>,
+  );
+});
+
+// Settings page — links to Donation tiers (and any future settings).
+adminRoutes.get("/settings", async (c) => {
+  return c.html(
+    <Layout title="Settings" siteName={c.env.SITE_NAME} user={c.get("user")}>
+      <AdminSettings />
     </Layout>,
   );
 });
@@ -333,7 +353,7 @@ adminRoutes.post("/events/:id/delete", async (c) => {
     await c.env.R2.delete(event.hero_r2_key).catch(() => {});
   }
   await c.env.DB.prepare("DELETE FROM events WHERE id = ?").bind(id).run();
-  return c.redirect("/admin");
+  return c.redirect("/admin/events");
 });
 
 // ---------------- event photos ----------------
@@ -615,12 +635,10 @@ adminRoutes.get("/donations", async (c) => {
 
   return c.html(
     <Layout title="Donations" siteName={c.env.SITE_NAME} user={user}>
-      <AdminShell user={user} activeTab="donations">
-        <DonationsAdminList
-          total={{ count: totals?.c ?? 0, sum: totals?.s ?? 0 }}
-          flash={flash}
-        />
-      </AdminShell>
+      <DonationsAdminList
+        total={{ count: totals?.c ?? 0, sum: totals?.s ?? 0 }}
+        flash={flash}
+      />
     </Layout>,
   );
 });
@@ -915,9 +933,7 @@ async function renderTiersPage(
   }
   return c.html(
     <Layout title="Donation tiers" siteName={c.env.SITE_NAME} user={user}>
-      <AdminShell user={user} activeTab="donation-tiers">
-        <DonationTiersAdmin tiers={tiers} editing={editing} error={opts.error} />
-      </AdminShell>
+      <DonationTiersAdmin tiers={tiers} editing={editing} error={opts.error} />
     </Layout>,
   );
 }
